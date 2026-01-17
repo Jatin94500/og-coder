@@ -14,12 +14,63 @@ A comprehensive machine learning system for monitoring space weather conditions 
 
 ## 📊 System Architecture
 
-```
-Data Collection → Feature Engineering → ML Models → Risk Assessment → Visualization
-     ↓                    ↓                 ↓              ↓              ↓
-  NOAA/NASA         Time Series        XGBoost        Risk Scoring    Dashboard
-   APIs             Features           LSTM           Algorithms      & Alerts
-                                      LightGBM
+```mermaid
+graph TB
+    subgraph "Data Sources"
+        A1[NOAA SWPC API]
+        A2[NASA DONKI API]
+        A3[GOES Satellite]
+    end
+    
+    subgraph "Data Collection Layer"
+        B[SpaceWeatherDataCollector]
+    end
+    
+    subgraph "Data Processing"
+        C[Feature Engineering]
+        D[Data Validation]
+        E[Synthetic Data Generator]
+    end
+    
+    subgraph "Machine Learning Models"
+        F1[Solar Flare Predictor<br/>XGBoost]
+        F2[Geomagnetic Storm Forecaster<br/>LSTM]
+        F3[Satellite Risk Assessor<br/>LightGBM]
+    end
+    
+    subgraph "Output Layer"
+        G1[Predictions & Forecasts]
+        G2[Risk Assessment]
+        G3[Alert System]
+        G4[Visualizations]
+    end
+    
+    subgraph "Storage"
+        H1[(Model Files)]
+        H2[(CSV Exports)]
+    end
+    
+    A1 --> B
+    A2 --> B
+    A3 --> B
+    B --> C
+    C --> D
+    E --> D
+    D --> F1
+    D --> F2
+    D --> F3
+    F1 --> G1
+    F2 --> G1
+    F3 --> G2
+    G1 --> G3
+    G2 --> G3
+    G1 --> G4
+    G2 --> G4
+    F1 -.Save.-> H1
+    F2 -.Save.-> H1
+    F3 -.Save.-> H1
+    G1 -.Export.-> H2
+    G2 -.Export.-> H2
 ```
 
 ## 🚀 Quick Start (Google Colab)
@@ -217,6 +268,18 @@ Contributions welcome! Areas for improvement:
 - NOAA Space Weather Prediction Center: https://www.swpc.noaa.gov/
 - NASA DONKI: https://kauai.ccmc.gsfc.nasa.gov/DONKI/
 - Space Weather Scales: https://www.swpc.noaa.gov/noaa-scales-explanation
+
+## 📐 System Diagrams
+
+For detailed flow diagrams, sequence diagrams, and architecture visualizations, see [SYSTEM_DIAGRAMS.md](SYSTEM_DIAGRAMS.md):
+- Overall System Architecture
+- Data Collection Flow
+- Machine Learning Pipeline
+- Prediction & Alert Flow
+- Real-Time Monitoring System
+- Model Training Workflow
+- Deployment Architecture
+- And more...
 
 ## ⚠️ Disclaimer
 

@@ -15,34 +15,61 @@ class SpaceWeatherDataCollector:
     """
     
     def __init__(self):
-        self.noaa_base_url = "https://services.swpc.noaa.gov/json"
+        self.noaa_base_url = "https://services.swpc.noaa.gov/products"
+        self.noaa_json_url = "https://services.swpc.noaa.gov/json"
         self.nasa_donki_url = "https://api.nasa.gov/DONKI"
-        self.nasa_api_key = "DEMO_KEY"  # Replace with your NASA API key from https://api.nasa.gov/
+        self.nasa_api_key = "geIwcHHNmfpeD9K3BmbPfUwKfn6x5LBsjh2mYBhI"  # Your NASA API key
         
     def get_solar_wind_data(self):
         """Fetch real-time solar wind data (7-day history)"""
-        try:
-            url = f"{self.noaa_base_url}/plasma-7-day.json"
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            df = pd.DataFrame(data)
-            df['time_tag'] = pd.to_datetime(df['time_tag'])
-            
-            # Convert numeric columns
-            numeric_cols = ['density', 'speed', 'temperature']
-            for col in numeric_cols:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            return df
-        except Exception as e:
-            print(f"Error fetching solar wind data: {e}")
-            return None
+        # Try multiple endpoints with correct paths
+        endpoints = [
+            f"{self.noaa_base_url}/solar-wind/plasma-7-day.json",
+            f"{self.noaa_base_url}/solar-wind/plasma-3-day.json",
+            f"{self.noaa_base_url}/solar-wind/plasma-1-day.json",
+        ]
+        
+        for url in endpoints:
+            try:
+                response = requests.get(url, timeout=15)
+                response.raise_for_status()  # Raise error for bad status codes
+                data = response.json()
+                
+                if not data or len(data) < 2:  # Need at least header + 1 row
+                    continue
+                
+                # NOAA format: first row is header, rest is data
+                if isinstance(data[0], list):
+                    headers = data[0]
+                    rows = data[1:]
+                    df = pd.DataFrame(rows, columns=headers)
+                else:
+                    df = pd.DataFrame(data)
+                
+                # Parse timestamp
+                if 'time_tag' in df.columns:
+                    df['time_tag'] = pd.to_datetime(df['time_tag'])
+                
+                # Convert numeric columns
+                numeric_cols = ['density', 'speed', 'temperature']
+                for col in numeric_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                print(f"✓ Solar wind data fetched from {url.split('/')[-1]}: {len(df)} records")
+                return df
+                
+            except Exception as e:
+                print(f"Trying alternative endpoint... ({e})")
+                continue
+        
+        print("⚠ All solar wind endpoints failed - system will use other data sources")
+        return None
     
     def get_geomagnetic_data(self):
         """Fetch geomagnetic K-index data"""
         try:
-            url = f"{self.noaa_base_url}/planetary_k_index_1m.json"
+            url = f"{self.noaa_json_url}/planetary_k_index_1m.json"
             response = requests.get(url, timeout=10)
             data = response.json()
             df = pd.DataFrame(data)
@@ -88,7 +115,7 @@ class SpaceWeatherDataCollector:
     def get_xray_flux(self):
         """Fetch X-ray flux data (GOES satellite)"""
         try:
-            url = f"{self.noaa_base_url}/goes/primary/xrays-7-day.json"
+            url = f"{self.noaa_json_url}/goes/primary/xrays-7-day.json"
             response = requests.get(url, timeout=10)
             data = response.json()
             df = pd.DataFrame(data)
@@ -106,7 +133,7 @@ class SpaceWeatherDataCollector:
     def get_proton_flux(self):
         """Fetch proton flux data"""
         try:
-            url = f"{self.noaa_base_url}/goes/primary/integral-protons-plot-6-hour.json"
+            url = f"{self.noaa_json_url}/goes/primary/integral-protons-plot-6-hour.json"
             response = requests.get(url, timeout=10)
             data = response.json()
             df = pd.DataFrame(data)
@@ -117,17 +144,49 @@ class SpaceWeatherDataCollector:
             return None
     
     def get_magnetometer_data(self):
-        """Fetch magnetometer data"""
-        try:
-            url = f"{self.noaa_base_url}/goes/primary/magnetometers-7-day.json"
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            df = pd.DataFrame(data)
-            df['time_tag'] = pd.to_datetime(df['time_tag'])
-            return df
-        except Exception as e:
-            print(f"Error fetching magnetometer data: {e}")
-            return None
+        """Fetch magnetometer data from solar wind"""
+        # Try multiple magnetometer endpoints
+        endpoints = [
+            f"{self.noaa_base_url}/solar-wind/mag-7-day.json",
+            f"{self.noaa_base_url}/solar-wind/mag-3-day.json",
+            f"{self.noaa_base_url}/solar-wind/mag-2-hour.json",
+            f"{self.noaa_json_url}/goes/primary/magnetometers-7-day.json",  # Fallback
+        ]
+        
+        for url in endpoints:
+            try:
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                
+                if not data or len(data) < 2:
+                    continue
+                
+                # Handle NOAA format (array of arrays with header)
+                if isinstance(data[0], list):
+                    headers = data[0]
+                    rows = data[1:]
+                    df = pd.DataFrame(rows, columns=headers)
+                else:
+                    df = pd.DataFrame(data)
+                
+                if 'time_tag' in df.columns:
+                    df['time_tag'] = pd.to_datetime(df['time_tag'])
+                
+                # Convert numeric columns
+                numeric_cols = ['bx_gsm', 'by_gsm', 'bz_gsm', 'bt', 'lat_gsm', 'lon_gsm']
+                for col in numeric_cols:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                print(f"✓ Magnetometer data from {url.split('/')[-1]}: {len(df)} records")
+                return df
+                
+            except Exception as e:
+                continue
+        
+        print("⚠ Magnetometer data unavailable")
+        return None
     
     def collect_all_data(self):
         """Collect all available data sources"""

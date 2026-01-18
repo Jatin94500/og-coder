@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Weather System - Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            border-left: 5px solid #3498db;
+        }
+
+        .diagram-container {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .mermaid {
+            text-align: center;
+        }
+
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🌌 Space Weather Prediction System - Flow Diagrams</h1>
+
+    <div class="note">
+        <strong>📌 Note:</strong> This HTML file renders all Mermaid diagrams directly in your browser.
+        Simply open this file in Chrome, Firefox, or Edge to view all diagrams.
+    </div>
+
+    <h2>1. Overall System Architecture</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            graph TB
+            subgraph "Data Sources"
+            A1[NOAA SWPC API]
+            A2[NASA DONKI API]
+            A3[GOES Satellite]
+            end
+
+            subgraph "Data Collection"
+            B[SpaceWeatherDataCollector]
+            end
+
+            subgraph "Processing"
+            C[Feature Engineering]
+            D[Data Validation]
+            E[Synthetic Data]
+            end
+
+            subgraph "ML Models"
+            F1[Solar Flare<br />XGBoost]
+            F2[Storm Forecast<br />LSTM]
+            F3[Risk Assessment<br />LightGBM]
+            end
+
+            subgraph "Output"
+            G1[Predictions]
+            G2[Risk Scores]
+            G3[Alerts]
+            G4[Visualizations]
+            end
+
+            A1 --> B
+            A2 --> B
+            A3 --> B
+            B --> C
+            C --> D
+            E --> D
+            D --> F1
+            D --> F2
+            D --> F3
+            F1 --> G1
+            F2 --> G1
+            F3 --> G2
+            G1 --> G3
+            G2 --> G3
+            G1 --> G4
+            G2 --> G4
+        </div>
+    </div>
+
+    <h2>2. Data Collection Flow</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            flowchart LR
+            A[Start] --> B{API Available?}
+            B -->|Yes| C[Fetch Solar Wind]
+            B -->|No| D[Use Cache]
+            C --> E[Fetch Geomagnetic]
+            E --> F[Fetch X-ray]
+            F --> G[Fetch Proton]
+            G --> H[Combine Data]
+            D --> H
+            H --> I{Valid?}
+            I -->|Yes| J[Return Data]
+            I -->|No| K[Log Error]
+            K --> L[Return Partial]
+            J --> M[End]
+            L --> M
+        </div>
+    </div>
+
+    <h2>3. Machine Learning Pipeline</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            flowchart TD
+            A[Raw Data] --> B[Feature Engineering]
+            B --> C[Preprocessing]
+            C --> D[Train/Test Split]
+
+            D --> E1[Flare Model]
+            D --> E2[Storm Model]
+            D --> E3[Risk Model]
+
+            E1 --> F1[XGBoost Training]
+            E2 --> F2[LSTM Training]
+            E3 --> F3[LightGBM Training]
+
+            F1 --> G[Evaluation]
+            F2 --> G
+            F3 --> G
+
+            G --> H{Good Performance?}
+            H -->|Yes| I[Save Models]
+            H -->|No| J[Tune Parameters]
+            J --> F1
+            I --> K[Deploy]
+        </div>
+    </div>
+
+    <h2>4. Prediction & Alert Flow</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            flowchart TD
+            A[New Data] --> B[Load Models]
+            B --> C[Preprocess]
+
+            C --> D1[Flare Prediction]
+            C --> D2[Storm Forecast]
+            C --> D3[Risk Assessment]
+
+            D1 --> E{Prob > 70%?}
+            D2 --> F{Kp > 5?}
+            D3 --> G{Risk > 7?}
+
+            E -->|Yes| H1[🔴 HIGH Alert]
+            E -->|No| I1[🟡 Check Moderate]
+            F -->|Yes| H2[🔴 Storm Alert]
+            F -->|No| I2[Monitor]
+            G -->|Yes| H3[🔴 Satellite Alert]
+            G -->|No| I3[🟢 Normal]
+
+            H1 --> M[Send Alert]
+            H2 --> M
+            H3 --> M
+            I1 --> M
+
+            M --> N[Update Dashboard]
+            I2 --> N
+            I3 --> N
+        </div>
+    </div>
+
+    <h2>5. Real-Time Monitoring Sequence</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            sequenceDiagram
+            participant User
+            participant System
+            participant API
+            participant Models
+            participant Alerts
+
+            User->>System: Start Monitoring
+
+            loop Every 15 minutes
+            System->>API: Fetch Data
+            API-->>System: Space Weather Data
+            System->>Models: Make Predictions
+            Models-->>System: Results
+
+            alt High Risk
+            System->>Alerts: Trigger Alert
+            Alerts->>User: 🔴 Send Notification
+            else Normal
+            System->>User: Update Dashboard
+            end
+            end
+        </div>
+    </div>
+
+    <h2>6. Alert System Decision Tree</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            graph TD
+            A[Analyze Conditions] --> B{Solar Wind > 700?}
+            B -->|Yes| C[🟡 High Speed]
+            B -->|No| D{Bz < -10?} D -->|Yes| E[🔴 Geoeffective]
+                D -->|No| F{Kp >= 7?}
+
+                F -->|Yes| G[🔴 Strong Storm]
+                F -->|No| H{Kp >= 5?}
+
+                H -->|Yes| I[🟡 Minor Storm]
+                H -->|No| J{Flare > 70%?}
+
+                J -->|Yes| K[🔴 High Flare Risk]
+                J -->|No| L{Risk > 7?}
+
+                L -->|Yes| M[🔴 Satellite Risk]
+                L -->|No| N[🟢 Normal]
+
+                C --> O[Generate Alert]
+                E --> O
+                G --> O
+                I --> O
+                K --> O
+                M --> O
+                N --> P[No Alert]
+        </div>
+    </div>
+
+    <h2>7. System State Machine</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            stateDiagram-v2
+            [*] --> Idle
+            Idle --> Collecting: Start Monitoring
+            Collecting --> Processing: Data Received
+            Processing --> Predicting: Data Valid
+            Processing --> Error: Data Invalid
+            Predicting --> Alerting: High Risk
+            Predicting --> Monitoring: Normal
+            Alerting --> Monitoring: Alert Sent
+            Monitoring --> Collecting: Next Cycle
+            Error --> Collecting: Retry
+            Monitoring --> Idle: Stop
+            Idle --> [*]
+        </div>
+    </div>
+
+    <h2>8. Deployment Architecture</h2>
+    <div class="diagram-container">
+        <div class="mermaid">
+            graph TB
+            subgraph "Frontend"
+            A1[Web Dashboard]
+            A2[Mobile App]
+            A3[API Clients]
+            end
+
+            subgraph "Backend"
+            B1[FastAPI Server]
+            B2[Streamlit UI]
+            B3[Scheduler]
+            end
+
+            subgraph "ML Layer"
+            C1[Flare Model]
+            C2[Storm Model]
+            C3[Risk Model]
+            end
+
+            subgraph "Data"
+            D1[(PostgreSQL)]
+            D2[(Redis Cache)]
+            end
+
+            subgraph "External"
+            E1[NOAA API]
+            E2[NASA API]
+            E3[Email Service]
+            end
+
+            A1 --> B1
+            A2 --> B1
+            A3 --> B1
+            B1 --> C1
+            B1 --> C2
+            B1 --> C3
+            B3 --> C1
+            B1 --> D1
+            B1 --> D2
+            B1 --> E1
+            B1 --> E2
+            B1 --> E3
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+
+    <div style="text-align: center; margin-top: 50px; padding: 20px; background: #ecf0f1; border-radius: 8px;">
+        <h3>✅ All Diagrams Rendered Successfully!</h3>
+        <p>These diagrams visualize the complete Space Weather Prediction System architecture.</p>
+        <p><strong>Tip:</strong> You can also view these on GitHub by pushing your code there.</p>
+    </div>
+</body>
+
+</html>
+margin-top: 40px;
+padding: 10px;
+background: #ecf0f1;

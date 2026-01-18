@@ -412,7 +412,7 @@ with col2:
 
 with col3:
     st.markdown("**Status:**")
-    st.markdown("🟢 System Operational")
+    st.markdown("🟢35 System Operational")
 
 # Refresh button
 if st.button("🔄 Refresh Data"):

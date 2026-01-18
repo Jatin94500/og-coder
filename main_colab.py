@@ -32,7 +32,7 @@ print("="*70)
 print("\n[STEP 1] Generating Synthetic Training Data...")
 print("-"*70)
 
-training_data = generate_synthetic_training_data(n_samples=10000)
+training_data = generate_synthetic_training_data(n_samples=50000)  # Increased from 10000
 
 # Apply feature engineering
 fe = FeatureEngineering()
@@ -66,7 +66,7 @@ flare_accuracy = flare_predictor.evaluate(X_flare_test, y_flare_test)
 # 2.2 Geomagnetic Storm Forecaster
 print("\n2.2 Geomagnetic Storm Forecasting Model (LSTM)")
 storm_forecaster = GeomagneticStormForecaster()
-X_storm, y_storm, storm_features = storm_forecaster.prepare_data(training_data, 'kp_index', lookback=24)
+X_storm, y_storm, storm_features = storm_forecaster.prepare_data(training_data, 'kp_index', lookback=48)  # Increased lookback
 
 split_idx = int(len(X_storm) * 0.8)
 X_storm_train, X_storm_test = X_storm[:split_idx], X_storm[split_idx:]

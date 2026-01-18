@@ -90,14 +90,14 @@ class GeomagneticStormForecaster:
         self.model = None
         self.scaler = StandardScaler()
         
-    def prepare_data(self, df, target_col='kp_index', lookback=24):
-        """Prepare time series data for LSTM"""
+    def prepare_data(self, df, target_col='kp_index', lookback=48):
+        """Prepare time series data for LSTM with longer lookback"""
         feature_cols = ['solar_wind_speed', 'proton_density', 'bt', 'bz', 'temperature', 'xray_flux']
         
         X = df[feature_cols].fillna(method='ffill').fillna(0).values
         y = df[target_col].fillna(0).values
         
-        # Create sequences
+        # Create sequences with longer lookback
         X_seq, y_seq = [], []
         for i in range(lookback, len(X)):
             X_seq.append(X[i-lookback:i])
@@ -106,21 +106,35 @@ class GeomagneticStormForecaster:
         return np.array(X_seq), np.array(y_seq), feature_cols
     
     def build_lstm_model(self, input_shape):
-        """Build LSTM model for time series forecasting"""
+        """Build improved LSTM model for time series forecasting"""
         model = Sequential([
-            Bidirectional(LSTM(64, return_sequences=True), input_shape=input_shape),
-            Dropout(0.3),
+            # First LSTM layer with more units
+            Bidirectional(LSTM(128, return_sequences=True), input_shape=input_shape),
+            Dropout(0.2),
+            
+            # Second LSTM layer
+            Bidirectional(LSTM(64, return_sequences=True)),
+            Dropout(0.2),
+            
+            # Third LSTM layer
             Bidirectional(LSTM(32)),
-            Dropout(0.3),
+            Dropout(0.2),
+            
+            # Dense layers
+            Dense(32, activation='relu'),
+            Dropout(0.2),
             Dense(16, activation='relu'),
             Dense(1, activation='linear')
         ])
         
-        model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+        # Use better optimizer
+        from tensorflow.keras.optimizers import Adam
+        optimizer = Adam(learning_rate=0.001)
+        model.compile(optimizer=optimizer, loss='mse', metrics=['mae'])
         return model
     
     def train(self, X_train, y_train):
-        """Train LSTM model"""
+        """Train LSTM model with improved settings"""
         print("Training Geomagnetic Storm Forecaster...")
         
         # Scale data
@@ -132,12 +146,12 @@ class GeomagneticStormForecaster:
         # Build and train model
         self.model = self.build_lstm_model((n_timesteps, n_features))
         
-        early_stop = EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)
-        reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, min_lr=1e-6)
+        early_stop = EarlyStopping(monitor='loss', patience=15, restore_best_weights=True)
+        reduce_lr = ReduceLROnPlateau(monitor='loss', factor=0.5, patience=7, min_lr=1e-6)
         
         self.model.fit(
             X_train_scaled, y_train,
-            epochs=50,
+            epochs=100,  # Increased from 50
             batch_size=32,
             callbacks=[early_stop, reduce_lr],
             verbose=0

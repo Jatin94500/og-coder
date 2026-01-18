@@ -91,6 +91,33 @@ with st.sidebar:
     st.markdown("**Storm Forecaster:** LSTM")
     st.markdown("**Risk Assessor:** LightGBM")
 
+# Load ML models
+@st.cache_resource
+def load_models():
+    """Load trained ML models"""
+    try:
+        import sys
+        import os
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.append(parent_dir)
+        
+        from ml_models import SolarFlarePredictor, GeomagneticStormForecaster, SatelliteRiskAssessor
+        
+        # Try to load saved models
+        flare_model = joblib.load(os.path.join(parent_dir, 'solar_flare_predictor.pkl'))
+        risk_model = joblib.load(os.path.join(parent_dir, 'satellite_risk_assessor.pkl'))
+        
+        # Load LSTM model
+        from tensorflow import keras
+        storm_model = GeomagneticStormForecaster()
+        storm_model.model = keras.models.load_model(os.path.join(parent_dir, 'geomagnetic_storm_forecaster.h5'))
+        storm_model.scaler = joblib.load(os.path.join(parent_dir, 'storm_scaler.pkl'))
+        
+        return flare_model, storm_model, risk_model
+    except Exception as e:
+        st.warning(f"⚠️ ML models not loaded: {e}. Using rule-based predictions.")
+        return None, None, None
+
 # Cache data collection
 @st.cache_data(ttl=900)  # Cache for 15 minutes
 def load_data():
@@ -113,6 +140,61 @@ def load_data():
     
     return data
 
+def prepare_features_for_prediction(conditions):
+    """Prepare features from current conditions for ML prediction"""
+    import numpy as np
+    
+    # Create feature vector matching training data
+    features = {
+        'solar_wind_speed': conditions.get('speed', 400),
+        'proton_density': conditions.get('density', 5),
+        'bt': conditions.get('bt', 5),
+        'bz': conditions.get('bz', 0),
+        'temperature': conditions.get('temperature', 100000),
+        'kp_index': conditions.get('kp', 2),
+    }
+    
+    # Add derived features
+    features['speed_squared'] = features['solar_wind_speed'] ** 2
+    features['density_speed'] = features['proton_density'] * features['solar_wind_speed']
+    features['bz_negative'] = 1 if features['bz'] < 0 else 0
+    
+    return pd.DataFrame([features])
+
+def predict_with_ml(conditions, flare_model, storm_model, risk_model):
+    """Make predictions using ML models"""
+    predictions = {
+        'flare_probability': 0.0,
+        'predicted_kp': conditions.get('kp', 2),
+        'risk_score': 0.0,
+        'using_ml': False
+    }
+    
+    try:
+        # Prepare features
+        features_df = prepare_features_for_prediction(conditions)
+        
+        # Flare prediction
+        if flare_model is not None:
+            flare_pred, flare_prob = flare_model.predict(features_df)
+            predictions['flare_probability'] = float(flare_prob[0][1]) if len(flare_prob[0]) > 1 else 0.0
+            predictions['using_ml'] = True
+        
+        # Risk assessment
+        if risk_model is not None:
+            risk_pred = risk_model.predict(features_df)
+            predictions['risk_score'] = float(risk_pred[0])
+            predictions['using_ml'] = True
+        
+        # Storm forecast (if we have time series data)
+        # Note: LSTM needs sequence data, so we'll use current Kp as baseline
+        predictions['predicted_kp'] = conditions.get('kp', 2)
+        
+    except Exception as e:
+        st.warning(f"ML prediction error: {e}")
+    
+    return predictions
+
 # Load data
 with st.spinner("🔄 Fetching real-time space weather data..."):
     try:
@@ -121,6 +203,14 @@ with st.spinner("🔄 Fetching real-time space weather data..."):
     except Exception as e:
         st.error(f"❌ Error loading data: {e}")
         st.stop()
+
+# Load ML models
+with st.spinner("🤖 Loading AI models..."):
+    flare_model, storm_model, risk_model = load_models()
+    if flare_model is not None:
+        st.success("✅ AI models loaded!")
+    else:
+        st.info("ℹ️ Using rule-based predictions (train models first with main_colab.py)")
 
 # Extract current conditions
 current_conditions = {}
@@ -139,9 +229,18 @@ if data['magnetometer'] is not None and len(data['magnetometer']) > 0:
     current_conditions['bz'] = latest_mag.get('bz_gsm', 'N/A')
     current_conditions['bt'] = latest_mag.get('bt', 'N/A')
 
-# Risk Assessment
-def calculate_risk(conditions):
-    """Calculate overall risk level"""
+# Get ML predictions
+ml_predictions = predict_with_ml(current_conditions, flare_model, storm_model, risk_model)
+
+# Risk Assessment (now using ML if available)
+def calculate_risk(conditions, ml_preds):
+    """Calculate overall risk level using ML predictions or rules"""
+    
+    # Use ML risk score if available
+    if ml_preds['using_ml'] and ml_preds['risk_score'] > 0:
+        return min(ml_preds['risk_score'], 10)
+    
+    # Fallback to rule-based
     risk_score = 0
     
     # Solar wind speed
@@ -167,7 +266,7 @@ def calculate_risk(conditions):
     
     return min(risk_score, 10)
 
-risk_level = calculate_risk(current_conditions)
+risk_level = calculate_risk(current_conditions, ml_predictions)
 
 # Alert Banner
 if risk_level >= 7:
@@ -212,11 +311,61 @@ with col4:
 with col5:
     st.metric(
         label="⚠️ Risk Level",
-        value=f"{risk_level}/10",
-        delta="Safe" if risk_level < 4 else "Alert"
+        value=f"{risk_level:.1f}/10",
+        delta="AI Predicted" if ml_predictions['using_ml'] else "Rule-based"
     )
 
 st.markdown("---")
+
+# ML Predictions Section
+if ml_predictions['using_ml']:
+    st.markdown("### 🤖 AI Model Predictions")
+    
+    pred_col1, pred_col2, pred_col3 = st.columns(3)
+    
+    with pred_col1:
+        flare_prob = ml_predictions['flare_probability'] * 100
+        st.metric(
+            label="☀️ Solar Flare Probability",
+            value=f"{flare_prob:.1f}%",
+            delta="XGBoost Model"
+        )
+        if flare_prob > 70:
+            st.error("🔴 HIGH: Flare likely in next 24h")
+        elif flare_prob > 40:
+            st.warning("🟡 MODERATE: Flare possible")
+        else:
+            st.success("🟢 LOW: Flare unlikely")
+    
+    with pred_col2:
+        predicted_kp = ml_predictions['predicted_kp']
+        st.metric(
+            label="🧲 Predicted Kp Index",
+            value=f"{predicted_kp:.1f}",
+            delta="LSTM Forecast"
+        )
+        if predicted_kp >= 7:
+            st.error("🔴 Strong storm predicted")
+        elif predicted_kp >= 5:
+            st.warning("🟡 Minor storm predicted")
+        else:
+            st.success("🟢 Quiet conditions")
+    
+    with pred_col3:
+        risk_score = ml_predictions['risk_score']
+        st.metric(
+            label="🛰️ Satellite Risk Score",
+            value=f"{risk_score:.1f}/10",
+            delta="LightGBM Model"
+        )
+        if risk_score >= 7:
+            st.error("🔴 HIGH: Take precautions")
+        elif risk_score >= 4:
+            st.warning("🟡 MODERATE: Monitor closely")
+        else:
+            st.success("🟢 LOW: Normal operations")
+    
+    st.markdown("---")
 
 # Tabs for different views
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Real-Time Data", "⚡ Recent Events", "📈 Trends", "🔮 Forecast"])
